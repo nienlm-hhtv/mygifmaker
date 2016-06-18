@@ -213,7 +213,7 @@ public class GifPreviewActivity extends Activity implements SeekBar.OnSeekBarCha
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            showCreateGifDialog();
+            //showCreateGifDialog();
         }
 
         @Override
@@ -364,10 +364,14 @@ public class GifPreviewActivity extends Activity implements SeekBar.OnSeekBarCha
                     showCreateGifDialog();
                 }
                 else{
-                    if (mGeneratedGifPath.equals("") || mPreviousDelayTime != mDelayTime)
+                    if (mGeneratedGifPath.equals("") || mPreviousDelayTime != mDelayTime) {
+                        showCreateGifDialog();
                         new ProcessCreateGif().execute();
-                    else
+                    }
+                    else{
                         shareGif(mGeneratedGifPath);
+                    }
+
                 }
                 //shareGif("/storage/emulated/0/myGifMaker/Gif/1466137557256.gif");
                 break;

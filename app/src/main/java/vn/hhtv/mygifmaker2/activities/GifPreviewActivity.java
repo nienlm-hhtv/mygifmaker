@@ -10,17 +10,23 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
 import android.hardware.Camera;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.annotation.NonNull;
+import android.text.Layout;
+import android.text.StaticLayout;
+import android.text.TextPaint;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
 
 import java.io.ByteArrayInputStream;
@@ -68,6 +74,7 @@ public class GifPreviewActivity extends Activity implements SeekBar.OnSeekBarCha
     String mFolder;
     int mDelayTime = 0, mPreviousDelayTime = 0,  mFixedDelaytime = 0;
     int mPlaytime;
+    private ProcessRotatingAllBitmap mProcessRotatingAllBitmap;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -97,7 +104,8 @@ public class GifPreviewActivity extends Activity implements SeekBar.OnSeekBarCha
         mSeekbar.setOnSeekBarChangeListener(this);
         hideDialog();
         playBitmap();
-        new ProcessRotatingAllBitmap().execute();
+        mProcessRotatingAllBitmap = new ProcessRotatingAllBitmap();
+        mProcessRotatingAllBitmap.execute();
     }
 
     @Override
@@ -183,17 +191,19 @@ public class GifPreviewActivity extends Activity implements SeekBar.OnSeekBarCha
                 File outFile = GifUtil.getRotatedOutputMediaFile(i,mFolder);
                 try {
 
-                    Canvas c = new Canvas(rotatedBitmap);
+                    /*Canvas c = new Canvas(rotatedBitmap);
                     Paint p = new Paint();
                     p.setColor(Color.WHITE);
-                    p.setStrokeWidth((int) (50 * scale));
+                    p.setTextSize(30f);
+                    p.setStrokeWidth((int) (12 * scale));
                     p.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));
                     c.drawBitmap(rotatedBitmap, 0, 0, p);
-                    c.drawText("Hát hát tê vê", 10, 10, p);
+                    c.drawText("Hát hát tê vê", 0, 0, p);*/
 
+                    Bitmap textedBitmap = drawText(rotatedBitmap,"hhtv.vn");
                     FileOutputStream out = new FileOutputStream(outFile);
-                    mRotatedBitmapList.add(rotatedBitmap);
-                    rotatedBitmap.compress(Bitmap.CompressFormat.PNG, 30, out);
+                    mRotatedBitmapList.add(textedBitmap);
+                    textedBitmap.compress(Bitmap.CompressFormat.PNG, 30, out);
                     out.flush();
                     out.close();
                 } catch (FileNotFoundException e) {
@@ -208,6 +218,43 @@ public class GifPreviewActivity extends Activity implements SeekBar.OnSeekBarCha
         }
     }
 
+
+
+    private void deleteTempfile(){
+        try{
+            if (mProcessRotatingAllBitmap.getStatus() == AsyncTask.Status.RUNNING){
+                mProcessRotatingAllBitmap.cancel(false);
+            }
+            File dir = new File(Environment.getExternalStorageDirectory()+"/myGifMaker/"+ "/Files/" + mFolder);
+            if (dir.isDirectory())
+            {
+                String[] children = dir.list();
+                for (int i = 0; i < children.length; i++)
+                {
+                    new File(dir, children[i]).delete();
+                }
+                dir.delete();
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public Bitmap drawText(Bitmap b, String text) {
+        Bitmap b1 = b.copy(Bitmap.Config.ARGB_8888, true);
+        Canvas c = new Canvas(b1);
+        c.drawBitmap(b1,0,0,null);
+        Paint paintText = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paintText.setColor(Color.WHITE);
+        paintText.setTextSize(40);
+        paintText.setStyle(Paint.Style.FILL);
+        //paintText.setShadowLayer(10f, 10f, 10f, Color.BLACK);
+
+        Rect rectText = new Rect();
+        paintText.getTextBounds(text, 0, text.length(), rectText);
+        c.drawText(text,b1.getWidth() - rectText.width(), b1.getHeight() - rectText.height(), paintText);
+        return b1;
+    }
 
     private class ProcessCreateGif extends AsyncTask<Void, Void, String>{
         @Override
@@ -344,9 +391,28 @@ public class GifPreviewActivity extends Activity implements SeekBar.OnSeekBarCha
     @Override
     public void onBackPressed() {
         //super.onBackPressed();
-        Intent i = new Intent(GifPreviewActivity.this, CaptureFrameActivity.class);
-        startActivity(i);
-        finish();
+        new MaterialDialog.Builder(this)
+                .title("Confirm cancel editting")
+                .content("Are you sure to exit current session ? Your data will be lost !")
+                .positiveText("Yes")
+                .negativeText("No")
+                .onPositive(new MaterialDialog.SingleButtonCallback() {
+                    @Override
+                    public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
+                        dialog.dismiss();
+                        deleteTempfile();
+                        Intent i = new Intent(GifPreviewActivity.this, CaptureFrameActivity.class);
+                        startActivity(i);
+                        finish();
+                    }
+                })
+                .onNegative(new MaterialDialog.SingleButtonCallback() {
+                    @Override
+                    public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
+                        dialog.dismiss();
+                    }
+                }).show();
+
     }
 
     @OnClick({R.id.retry_btn, R.id.share_btn})

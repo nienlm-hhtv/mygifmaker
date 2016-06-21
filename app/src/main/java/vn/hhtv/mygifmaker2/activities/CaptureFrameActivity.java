@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
@@ -70,6 +71,8 @@ public class CaptureFrameActivity extends Activity {
     ImageView mCaptureBtn;
     @BindView(R.id.changecamera_btn)
     ImageView mChangeCameraBtn;
+    @BindView(R.id.turnflash_btn)
+    ImageView mTurnFlashBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,15 +89,22 @@ public class CaptureFrameActivity extends Activity {
                     Toast.LENGTH_LONG).show();
         }
 
+        boolean hasFlash = getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
+        if (!hasFlash)
+            mTurnFlashBtn.setVisibility(View.GONE);
+
+        mTurnFlashBtn.setVisibility(View.GONE);
+
         if (Camera.getNumberOfCameras() == 1) this.mChangeCameraBtn.setVisibility(View.GONE);
         this.mChangeCameraBtn.setTag(Camera.CameraInfo.CAMERA_FACING_BACK);
+        this.mTurnFlashBtn.setTag(0);
         this.mCameraSurfaceView = new MyCameraSurfaceView(this,mCamera);
         mFrame.addView(mCameraSurfaceView);
         this.currentFileFolder = Calendar.getInstance().getTimeInMillis() + "";
         this.t = new Timer();
     }
 
-    @OnClick({R.id.capture_btn, R.id.changecamera_btn})
+    @OnClick({R.id.capture_btn, R.id.changecamera_btn, R.id.turnflash_btn})
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.capture_btn:
@@ -103,8 +113,12 @@ public class CaptureFrameActivity extends Activity {
             case R.id.changecamera_btn:
                 onChangeCameraBtnClicked.onClick(view);
                 break;
+            case R.id.turnflash_btn:
+                onTurnFlashBtnClicked.onClick(view);
+                break;
         }
     }
+
 
 
 
@@ -129,6 +143,23 @@ public class CaptureFrameActivity extends Activity {
             e.printStackTrace();
         }
     }
+
+
+    View.OnClickListener onTurnFlashBtnClicked = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            if ((int)mTurnFlashBtn.getTag() == 1){ //1 = flash enabled, 0 = flash disabled
+                mTurnFlashBtn.setTag(0);
+                Picasso.with(CaptureFrameActivity.this).load(R.drawable.ic_flash_off)
+                        .into(mTurnFlashBtn);
+            }else{
+                mTurnFlashBtn.setTag(1);
+                Picasso.with(CaptureFrameActivity.this).load(R.drawable.ic_flash_on)
+                        .into(mTurnFlashBtn);
+            }
+            turnFlash((int)mTurnFlashBtn.getTag());
+        }
+    };
 
 
     View.OnClickListener onChangeCameraBtnClicked = new View.OnClickListener() {
@@ -158,6 +189,55 @@ public class CaptureFrameActivity extends Activity {
         mFrame.addView(mCameraSurfaceView);
     }
 
+    private void turnFlash(int flashId) {
+        //this.mCurrentCameraId = cameraId;
+        Toast.makeText(this,"turn flash !" + flashId, Toast.LENGTH_SHORT).show();
+        this.mCameraSurfaceView.removeCallback();
+        this.mCameraSurfaceView.surfaceDestroyed(mCameraSurfaceView.getHolder());
+        this.mFrame.removeAllViews();
+        this.mCameraSurfaceView = null;
+        this.mCamera.stopPreview();
+        this.mCamera.release();
+        this.mCamera = Camera.open(this.mCurrentCameraId);
+        Camera.Parameters  p = mCamera.getParameters();
+        p.setFlashMode(flashId == 1 ? Camera.Parameters.FLASH_MODE_TORCH : Camera.Parameters.FLASH_MODE_OFF);
+        //p.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+        this.mCamera.setParameters(p);
+        this.mCamera.startPreview();
+        this.mCameraSurfaceView = new MyCameraSurfaceView(this,mCamera);
+        mFrame.addView(mCameraSurfaceView);
+    }
+    public void closeCamera() {
+        try{
+            if (mCamera != null) {
+                mCamera.stopPreview();
+                mCamera.setPreviewCallback(null);
+                mCamera.lock();
+                mCamera.release();
+                mCamera=null;
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        closeCamera();
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        super.onPause();
+
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
 
     View.OnClickListener onCaptureBtnClicked = new View.OnClickListener() {
         @Override
@@ -184,6 +264,7 @@ public class CaptureFrameActivity extends Activity {
 
             }else{
                 mChangeCameraBtn.setVisibility(View.GONE);
+                mTurnFlashBtn.setVisibility(View.GONE);
                 isRecoding = true;
                 previewStart = Calendar.getInstance().getTimeInMillis();
                 Picasso.with(CaptureFrameActivity.this).load(R.drawable.ic_action_record)
@@ -458,6 +539,8 @@ public class CaptureFrameActivity extends Activity {
                 mPreviewSize = getOptimalPreviewSize(new ArrayList<Camera.Size>(){{
                     add(size3);
                 }}, width, height);
+
+                //mPreviewSize = getOptimalPreviewSize(mSupportedPreviewSizes, width, height);
             }
 
             float ratio;
